@@ -11,13 +11,27 @@ resource "azurerm_resource_group" "rg" {
   location = var.resource_group_location
 }
 
-# Azure Key Vault para guardar secretos
 resource "azurerm_key_vault" "kv" {
   name                = "kv-${var.base_name}-${random_string.suffix.result}"
   location            = azurerm_resource_group.rg.location
   resource_group_name = azurerm_resource_group.rg.name
   tenant_id           = data.azurerm_client_config.current.tenant_id
   sku_name            = "standard"
+  
+  # Esta política le da permisos a la identidad que ejecuta Terraform
+  # para que pueda gestionar los secretos dentro de este Key Vault.
+  access_policy {
+    tenant_id = data.azurerm_client_config.current.tenant_id
+    object_id = data.azurerm_client_config.current.object_id # ID de tu Entidad de Servicio
+
+    # Permisos necesarios para los secretos
+    secret_permissions = [
+      "Get",
+      "List",
+      "Set",
+      "Delete",
+    ]
+  }
 }
 
 # Genera una contraseña segura y la guarda en Key Vault
