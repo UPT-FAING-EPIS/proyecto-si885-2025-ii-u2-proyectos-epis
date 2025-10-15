@@ -3,7 +3,7 @@ name: 'Ejecutar Script de Análisis de Repositorios'
 on:
   workflow_dispatch:
   schedule:
-    # Se ejecuta a la 1:00 AM UTC todos los domingos
+    # Se ejecuta a la 1:00 AM UTC todos los domingos.
     - cron: '0 1 * * 0'
 
 jobs:
@@ -29,6 +29,11 @@ jobs:
         curl https://packages.microsoft.com/config/ubuntu/22.04/prod.list | sudo tee /etc/apt/sources.list.d/mssql-release.list
         sudo apt-get update
         sudo ACCEPT_EULA=Y apt-get install -y msodbcsql18
+
+    # --- INICIO DEL NUEVO PASO DE DIAGNÓSTICO ---
+    - name: (DEBUG) Verificar drivers ODBC instalados
+      run: odbcinst -q -d
+    # --- FIN DEL NUEVO PASO DE DIAGNÓSTICO ---
 
     - name: Ejecutar el script de Python
       run: python analizador_proyectos.py
