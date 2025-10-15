@@ -143,8 +143,8 @@ El pipeline de Python analiza múltiples indicadores en cada repositorio para ob
 
 ## 📎 Enlaces del Proyecto
 
-- 🔗 **Dashboard Power BI:** *(Se añadirá enlace una vez desplegado)*
-- 🔗 **Repositorio GitHub:** [proyecto-si885-2025-ii-u1-proyectos-participantes-epis](https://github.com/universidad/proyecto-si885-2025-ii-u1-proyectos-participantes-epis)
+- 🔗 **Dashboard Power BI:** [Dashboard-Proyectos](https://app.powerbi.com/reportEmbed?reportId=d1d6a818-041c-46c6-85b7-4c4393b58afa&autoAuth=true&ctid=b6b466ee-468d-4011-b9fc-fbdcf82ac90a)
+- 🔗 **Repositorio GitHub:** [Proyectos-EPIS](https://github.com/UPT-FAING-EPIS/proyecto-si885-2025-ii-u2-proyectos-epis)
 
 ---
 
