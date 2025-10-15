@@ -16,5 +16,4 @@ output "admin_username" {
 output "sql_admin_password" {
   description = "La contraseña del administrador de SQL (sensible)."
   value       = random_password.sql_password.result
-  sensitive   = true
 }
