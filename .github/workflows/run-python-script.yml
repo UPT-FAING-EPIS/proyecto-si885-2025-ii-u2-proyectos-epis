@@ -3,7 +3,7 @@ name: 'Ejecutar Script de Análisis de Repositorios'
 on:
   workflow_dispatch:
   schedule:
-    # Se ejecuta a la 1:00 AM UTC todos los domingos.
+    # Se ejecuta a la 1:00 AM UTC todos los domingos
     - cron: '0 1 * * 0'
 
 jobs:
