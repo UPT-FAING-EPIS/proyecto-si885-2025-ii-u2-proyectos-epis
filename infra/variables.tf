@@ -7,7 +7,7 @@ variable "resource_group_location" {
 variable "base_name" {
   type        = string
   description = "Un nombre base único para todos los recursos."
-  default     = "proyectointenegocios"
+  default     = "pyintnegocios"
 }
 
 variable "sql_admin_username" {
