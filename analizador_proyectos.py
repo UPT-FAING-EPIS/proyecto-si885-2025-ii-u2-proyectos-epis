@@ -1,4 +1,5 @@
 import os
+from xmlrpc import server
 import requests
 import pyodbc  # CAMBIO: Usamos pyodbc en lugar de csv
 from dotenv import load_dotenv
@@ -218,7 +219,7 @@ def main():
         password = os.getenv("DB_PASSWORD")
         
         print("\nConectando a la base de datos Azure SQL...")
-        conn_str = f'DRIVER={{ODBC Driver 17 for SQL Server}};SERVER=tcp:{server}.database.windows.net,1433;DATABASE={database};UID={username};PWD={password}'
+        conn_str = f'DRIVER={{ODBC Driver 18 for SQL Server}};SERVER=tcp:{server}.database.windows.net,1433;DATABASE={database};UID={username};PWD={password}'
         conn = pyodbc.connect(conn_str)
         
         cursor = conn.cursor()
