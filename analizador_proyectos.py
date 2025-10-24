@@ -1,15 +1,15 @@
 import os
-from xmlrpc import server
+# from xmlrpc import server #<- Esta importación no era necesaria
 import requests
-import pyodbc  # CAMBIO: Usamos pyodbc en lugar de csv
+import pyodbc
 from dotenv import load_dotenv
 import time
 import base64
+# import datetime #<- Ya no es necesario para este enfoque
 
 # --- CONFIGURACIÓN INICIAL ---
 load_dotenv()
 TOKEN = os.getenv("GITHUB_TOKEN")
-# CAMBIO: Cargamos las credenciales de la BD
 DB_HOST = os.getenv("DB_HOST")
 DB_NAME = os.getenv("DB_NAME")
 DB_USER = os.getenv("DB_USER")
@@ -21,7 +21,7 @@ if not TOKEN or not DB_HOST:
 ORG = "UPT-FAING-EPIS"
 HEADERS = {"Authorization": f"token {TOKEN}"}
 
-# --- (Todas las funciones de análisis de repositorios son las mismas) ---
+# --- (Funciones de análisis sin cambios) ---
 def get_repo_files(owner, repo_name, path=""):
     contents_url = f"https://api.github.com/repos/{owner}/{repo_name}/contents/{path}"
     try:
@@ -102,14 +102,14 @@ def analyze_dependencies(root_files_json):
             print(f"--- Analizando dependencias en '{file_name}'...")
             content = get_file_content(file_info.get("url", ""))
             if not content: continue
-            
+
             content_lower = content.lower()
 
             if file_name == "package.json":
                 if any(pkg in content_lower for pkg in ['"@aws-sdk/', '"aws-sdk"']): techs.add("AWS")
                 if any(pkg in content_lower for pkg in ['"@google-cloud/', '"gcp-metadata"']): techs.add("Google Cloud")
                 if any(pkg in content_lower for pkg in ['"@azure/']): techs.add("Azure")
-            
+
             elif file_name == "requirements.txt":
                 if "boto3" in content_lower: techs.add("AWS")
                 if "google-cloud" in content_lower: techs.add("Google Cloud")
@@ -124,7 +124,7 @@ def analyze_dependencies(root_files_json):
                 if "github.com/aws/aws-sdk-go" in content_lower: techs.add("AWS")
                 if "cloud.google.com/go" in content_lower: techs.add("Google Cloud")
                 if "github.com/azure/azure-sdk-for-go" in content_lower: techs.add("Azure")
-            
+
             elif file_name.startswith("build.gradle"):
                 if "com.amazonaws" in content_lower or "aws.sdk" in content_lower: techs.add("AWS")
                 if "com.google.cloud" in content_lower: techs.add("Google Cloud")
@@ -134,7 +134,7 @@ def analyze_dependencies(root_files_json):
                 if '"aws/aws-sdk-php"' in content_lower: techs.add("AWS")
                 if '"google/cloud"' in content_lower: techs.add("Google Cloud")
                 if '"microsoft/azure' in content_lower: techs.add("Azure")
-    
+
     if is_csproj_present:
         csproj_file_info = next((f for f in root_files_json if f.get("name", "").endswith(".csproj")), None)
         if csproj_file_info:
@@ -151,7 +151,7 @@ def analyze_dependencies(root_files_json):
 # --- SCRIPT PRINCIPAL ---
 def main():
     print(f"Buscando repositorios en la organización: {ORG}...")
-    
+
     repos_api_url = f"https://api.github.com/orgs/{ORG}/repos"
     all_repos_data = []
     page = 1
@@ -163,10 +163,10 @@ def main():
         if not data: break
 
         print(f"Página {page} obtenida, procesando {len(data)} repositorios...")
-        
+
         for repo in data:
             repo_name = repo["name"]
-            
+
             if "proyecto" not in repo_name.lower():
                 continue
 
@@ -174,7 +174,7 @@ def main():
                 continue
 
             print(f"\nAnalizando '{repo_name}'...")
-            
+
             root_files_json = get_repo_files(ORG, repo_name)
             detected_techs = analyze_deployment_tech(root_files_json)
             detected_techs.update(analyze_dependencies(root_files_json))
@@ -194,12 +194,14 @@ def main():
                         workflow_content = get_file_content(wf_file['url'])
                         if workflow_content:
                             detected_techs.update(analyze_tech_from_content(workflow_content))
-            
+
+            # --- CAMBIO: Añadimos la fecha de creación al diccionario ---
             all_repos_data.append({
-                "Nombre": repo_name,
+                "Nombre": repo["name"], # Usar repo["name"] directamente
                 "URL": repo["html_url"],
                 "Lenguaje Principal": repo.get("language", "N/A"),
-                "Tecnologías": sorted(list(detected_techs))
+                "Tecnologías": sorted(list(detected_techs)),
+                "Fecha Creacion": repo["created_at"] # <-- CAMBIO AÑADIDO
             })
             time.sleep(1)
 
@@ -209,7 +211,7 @@ def main():
         print("No se encontró ningún repositorio que cumpla con los filtros.")
         return
 
-    # ### INICIO DE LA NUEVA SECCIÓN DE CARGA A AZURE SQL ###
+    # ### INICIO DE LA SECCIÓN MODIFICADA PARA CARGA CON FECHA DE CREACIÓN ###
     conn = None
     try:
         # Preparar la cadena de conexión para Azure SQL
@@ -217,42 +219,50 @@ def main():
         database = os.getenv("DB_NAME")
         username = os.getenv("DB_USER")
         password = os.getenv("DB_PASSWORD")
-        
+
         print("\nConectando a la base de datos Azure SQL...")
         conn_str = f'DRIVER={{ODBC Driver 18 for SQL Server}};SERVER=tcp:{server}.database.windows.net,1433;DATABASE={database};UID={username};PWD={password}'
         conn = pyodbc.connect(conn_str)
-        
+
         cursor = conn.cursor()
 
-        print("Limpiando tabla de análisis anterior...")
-        cursor.execute("TRUNCATE TABLE analisis_repositorios;")
+        # Opcional: Limpiar la tabla antes de insertar si solo quieres el estado más reciente
+        # print("Limpiando tabla de análisis anterior...")
+        # cursor.execute("TRUNCATE TABLE analisis_repositorios;") # Descomenta si quieres borrar antes
 
-        print(f"Insertando {len(all_repos_data)} registros en la base de datos...")
-        for repo in all_repos_data:
-            tecnologias_str = ", ".join(repo["Tecnologías"])
-            
-            # El comando MERGE es el equivalente a INSERT ... ON CONFLICT en SQL Server
+        print(f"Insertando o actualizando {len(all_repos_data)} registros en la base de datos...")
+        for repo_data in all_repos_data:
+            tecnologias_str = ", ".join(repo_data["Tecnologías"])
+
+            # --- CAMBIO: Procesar y usar la fecha de creación ---
+            fecha_creacion_str = repo_data["Fecha Creacion"]
+            # Convertimos la fecha de ISO 8601 (ej: "2024-01-15T10:30:00Z") a solo fecha (YYYY-MM-DD)
+            fecha_creacion_date = fecha_creacion_str.split('T')[0]
+            # --- FIN CAMBIO ---
+
+            # El comando MERGE sigue siendo útil para actualizar si el repo ya existe
             insert_query = """
             MERGE INTO analisis_repositorios AS target
-            USING (VALUES (?, ?, ?, ?)) AS source (nombre_repo, url_repo, lenguaje_principal, tecnologias)
+            USING (VALUES (?, ?, ?, ?, ?)) AS source (nombre_repo, url_repo, lenguaje_principal, tecnologias, fecha_creacion_repo)
             ON target.nombre_repo = source.nombre_repo
             WHEN MATCHED THEN
-                UPDATE SET 
+                UPDATE SET
                     url_repo = source.url_repo,
                     lenguaje_principal = source.lenguaje_principal,
-                    tecnologias = source.tecnologias,
-                    fecha_analisis = GETDATE()
+                    tecnologias = source.tecnologias
+                    -- No actualizamos fecha_creacion_repo porque es fija
             WHEN NOT MATCHED THEN
-                INSERT (nombre_repo, url_repo, lenguaje_principal, tecnologias)
-                VALUES (source.nombre_repo, source.url_repo, source.lenguaje_principal, source.tecnologias);
+                INSERT (nombre_repo, url_repo, lenguaje_principal, tecnologias, fecha_creacion_repo)
+                VALUES (source.nombre_repo, source.url_repo, source.lenguaje_principal, source.tecnologias, source.fecha_creacion_repo);
             """
             cursor.execute(insert_query, (
-                repo["Nombre"],
-                repo["URL"],
-                repo["Lenguaje Principal"],
-                tecnologias_str
+                repo_data["Nombre"],
+                repo_data["URL"],
+                repo_data["Lenguaje Principal"],
+                tecnologias_str,
+                fecha_creacion_date # Usamos la fecha de creación procesada
             ))
-        
+
         conn.commit()
         print("¡Carga de datos a la base de datos completada con éxito!")
 
@@ -263,7 +273,7 @@ def main():
             cursor.close()
             conn.close()
             print("Conexión a la base de datos cerrada.")
-    ### FIN DE LA NUEVA SECCIÓN ###
+    ### FIN DE LA SECCIÓN MODIFICADA ###
 
 
 if __name__ == "__main__":
